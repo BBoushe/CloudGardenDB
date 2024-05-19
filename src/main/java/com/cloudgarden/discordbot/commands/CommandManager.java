@@ -1,9 +1,6 @@
 package com.cloudgarden.discordbot.commands;
 
-import com.google.gson.Gson;
-import com.google.gson.JsonArray;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonParser;
+import com.google.gson.*;
 import io.github.cdimascio.dotenv.Dotenv;
 import net.dv8tion.jda.api.entities.Role;
 import net.dv8tion.jda.api.events.guild.GuildJoinEvent;
@@ -28,33 +25,71 @@ import java.util.List;
 public class CommandManager extends ListenerAdapter {
     private final OkHttpClient client = new OkHttpClient();
     private final Gson gson = new Gson();
-
-
-
-
-
     private final Dotenv config =  Dotenv.configure().load();
-    private static final String API = "https://ictfinal.azurewebsites.net/User/";
-    private static final String getPlants = "GetPlants?username=";
     private String user = "";
 
-    public void setUser(String user) { this.user = user; }
 
 
+
+    private static final String API = "https://ictfinal.azurewebsites.net/User/";
+    private static final String getPlants = "GetPlants?username=";
     String api = config.get("API");
     String get_plants = config.get("GET_PLANT");
 
 
-    private static List<CommandData> addCommands(){
-        List<CommandData> commandData = new ArrayList<>();
-        commandData.add(Commands.slash("welcome", "Welcomes the user to the server."));
-        commandData.add(Commands.slash("roles", "Display all roles on the server."));
-        commandData.add(Commands.slash("check", "Manually checks plants' status."));
 
-        OptionData option1 = new OptionData(OptionType.STRING, "username", "The user you want to set", true);
-        commandData.add(Commands.slash("set_user", "Set the user for which you want to retrieve information.").addOptions(option1));
 
-        return commandData;
+    public void setUser(String user) { this.user = user; }
+
+    private String fetchData(){
+        Request request = new Request.Builder()
+                .url(API+getPlants+user)
+                .build();
+
+        try(Response response = client.newCall(request).execute()) {
+            if(response.isSuccessful()) {
+                assert response.body() != null;
+                String json = response.body().string();
+                JsonArray plants = JsonParser.parseString(json).getAsJsonArray();
+
+                StringBuilder reply = new StringBuilder();
+                reply.append("Plants for user ").append(user).append(":\n");
+
+                List<String> plantNames = new ArrayList<>();
+
+                for (JsonElement plant : plants){
+                    JsonObject plantObject = plant.getAsJsonObject();
+                    String plantName = plantObject.get("plantTypeName").getAsString();
+                    plantNames.add(plantName);
+
+                    // The below code gets the whole JSON string if you need it
+//                    String plantsString = gson.toJson(plant);
+//                    reply.append(plantsString).append("\n");
+                }
+
+                String[] plantNamesArray = plantNames.toArray(new String[0]);
+
+                int i = 1;
+                for (String name : plantNamesArray) {
+                    reply.append(i++).append(". ").append(name).append("\n");
+                }
+
+                return reply.toString();
+            } else {
+                return "Failed to fetch platns. HTTP " + response.code();
+            }
+        } catch (Exception e) {
+            System.out.println("Error: " + e.getMessage());
+        }
+        return null;
+    }
+
+    private String parseData(String data) {
+        StringBuilder parsedReply = new StringBuilder();
+
+
+
+        return parsedReply.toString();
     }
 
     private void setUserCommand(SlashCommandInteractionEvent event){
@@ -65,37 +100,16 @@ public class CommandManager extends ListenerAdapter {
         event.reply("The username has been set to: **" + username + "**!").queue();
     }
 
-    private void checkCommand(SlashCommandInteractionEvent event){
+    private void plantsCommand(SlashCommandInteractionEvent event){
         event.deferReply().queue();
 
-        OptionMapping messageOption = event.getOption("username");
-        String username = messageOption.getAsString();
-        setUser(username);
+        String reply = fetchData();
 
-        Request request = new Request.Builder()
-                .url(API+getPlants+user)
-                .build();
+        assert reply != null;
+        event.getHook().sendMessage(reply).queue();
+    }
 
-        try(Response response = client.newCall(request).execute()) {
-            if(response.isSuccessful()) {
-                String json = response.body().string();
-                JsonArray plants = JsonParser.parseString(json).getAsJsonArray();
-
-                StringBuilder reply = new StringBuilder();
-                reply.append("Plants for user ").append(user).append(":\n");
-
-                for (JsonElement plant : plants){
-                    String plantsString = gson.toJson(plant);
-                    reply.append(plantsString).append("\n");
-                }
-
-                event.getHook().sendMessage(reply.toString()).queue();
-            } else {
-                event.getHook().sendMessage("Failed to fetch platns. HTTP " + response.code()).queue();
-            }
-        } catch (Exception e) {
-            event.reply("Error: " + e.getMessage()).queue();
-        }
+    private void checkCommand(SlashCommandInteractionEvent event){
 
     }
     @Override
@@ -115,9 +129,26 @@ public class CommandManager extends ListenerAdapter {
 
             event.reply(response).queue();
         } else if(commandVar.equals("set_user")){
+            setUserCommand(event);
+        } else if(commandVar.equals("check")){
             checkCommand(event);
+        } else if(commandVar.equals("plants")){
+            plantsCommand(event);
         }
 
+    }
+
+    private static List<CommandData> addCommands(){
+        List<CommandData> commandData = new ArrayList<>();
+        commandData.add(Commands.slash("welcome", "Welcomes the user to the server."));
+        commandData.add(Commands.slash("roles", "Display all roles on the server."));
+        commandData.add(Commands.slash("check", "Manually checks plants' status."));
+        commandData.add(Commands.slash("plants", "Display all plants associated to the user."));
+
+        OptionData option1 = new OptionData(OptionType.STRING, "username", "The user you want to set", true);
+        commandData.add(Commands.slash("set_user", "Set the user for which you want to retrieve information.").addOptions(option1));
+
+        return commandData;
     }
 
     @Override
