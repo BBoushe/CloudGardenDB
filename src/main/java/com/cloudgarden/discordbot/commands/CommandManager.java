@@ -6,7 +6,6 @@ import net.dv8tion.jda.api.entities.Role;
 import net.dv8tion.jda.api.events.guild.GuildJoinEvent;
 import net.dv8tion.jda.api.events.guild.GuildReadyEvent;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
-import net.dv8tion.jda.api.events.session.ReadyEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import net.dv8tion.jda.api.interactions.commands.OptionMapping;
 import net.dv8tion.jda.api.interactions.commands.OptionType;
@@ -28,22 +27,16 @@ public class CommandManager extends ListenerAdapter {
     private final Dotenv config =  Dotenv.configure().load();
     private String user = "";
 
-
-
-
-    private static final String API = "https://ictfinal.azurewebsites.net/User/";
-    private static final String getPlants = "GetPlants?username=";
     String api = config.get("API");
     String get_plants = config.get("GET_PLANT");
-
-
+    String get_measurements = config.get("GET_MEASUREMENTS");
 
 
     public void setUser(String user) { this.user = user; }
 
-    private String fetchData(){
+    private String getPlants(){
         Request request = new Request.Builder()
-                .url(API+getPlants+user)
+                .url(api+get_plants+user)
                 .build();
 
         try(Response response = client.newCall(request).execute()) {
@@ -84,13 +77,69 @@ public class CommandManager extends ListenerAdapter {
         return null;
     }
 
-    private String parseData(String data) {
-        StringBuilder parsedReply = new StringBuilder();
-
-
-
-        return parsedReply.toString();
-    }
+//    private String getMeasurements(int id){
+//        Request request = new Request.Builder()
+//                .url(api+get_measurements+id)
+//                .build();
+//
+//        try(Response response = client.newCall(request).execute()) {
+//            if(response.isSuccessful()) {
+//                assert response.body() != null;
+//                String json = response.body().string();
+//                JsonArray plants = JsonParser.parseString(json).getAsJsonArray();
+//                JsonElement first = plants.get(0);
+//
+////                "id": 21,
+////    "lightIntensity": 53.37,
+////    "temperatureMeasurement": 22.1,
+////    "humidityMeasurement": 56.6,
+////    "soilMeasurement": 3.52,
+////    "plantId": 3,
+////    "date": "2024-05-17T18:41:28.1818351"
+//                int  lux = first.get
+//                StringBuilder reply = new StringBuilder();
+//                reply.append("Plant measurements for user ").append(user).append(":\n");
+//
+//                List<String> plantItems = new ArrayList<>();
+//                int[] measurements = new int[4];
+//
+//                for (JsonElement plant : plants){
+////                    JsonObject plantObject = plant.getAsJsonObject();
+////                    String plantName = plantObject.get("plantTypeName").getAsString();
+////                    plantNames.add(plantName);
+//
+//                    // The below code gets the whole JSON string if you need it
+//                    String plantsString = gson.toJson(plant);
+//                    reply.append(plantsString).append("\n");
+//                }
+//
+//                String[] plantNamesArray = plantNames.toArray(new String[0]);
+//
+//                int i = 1;
+//                for (String name : plantNamesArray) {
+//                    reply.append(i++).append(". ").append(name).append("\n");
+//                }
+//
+//                return reply.toString();
+//            } else {
+//                return "Failed to fetch platns. HTTP " + response.code();
+//            }
+//        } catch (Exception e) {
+//            System.out.println("Error: " + e.getMessage());
+//        }
+//        return null;
+//    }
+//    }
+//
+//    private String parseData(String data) {
+//        StringBuilder parsedReply = new StringBuilder();
+//
+//
+//
+//
+//
+//        return parsedReply.toString();
+//    }
 
     private void setUserCommand(SlashCommandInteractionEvent event){
         OptionMapping messageOption = event.getOption("username");
@@ -103,13 +152,17 @@ public class CommandManager extends ListenerAdapter {
     private void plantsCommand(SlashCommandInteractionEvent event){
         event.deferReply().queue();
 
-        String reply = fetchData();
+        String reply = getPlants();
 
         assert reply != null;
         event.getHook().sendMessage(reply).queue();
     }
 
     private void checkCommand(SlashCommandInteractionEvent event){
+
+    }
+
+    private void measurementsCommand(SlashCommandInteractionEvent event){
 
     }
     @Override
@@ -144,6 +197,7 @@ public class CommandManager extends ListenerAdapter {
         commandData.add(Commands.slash("roles", "Display all roles on the server."));
         commandData.add(Commands.slash("check", "Manually checks plants' status."));
         commandData.add(Commands.slash("plants", "Display all plants associated to the user."));
+        commandData.add(Commands.slash("measurements", "Get current measurements for plant."));
 
         OptionData option1 = new OptionData(OptionType.STRING, "username", "The user you want to set", true);
         commandData.add(Commands.slash("set_user", "Set the user for which you want to retrieve information.").addOptions(option1));
