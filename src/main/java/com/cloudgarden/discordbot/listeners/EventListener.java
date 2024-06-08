@@ -1,17 +1,10 @@
 package com.cloudgarden.discordbot.listeners;
 
-import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.entities.Message;
-import net.dv8tion.jda.api.entities.User;
-import net.dv8tion.jda.api.entities.channel.Channel;
-import net.dv8tion.jda.api.entities.channel.ChannelType;
 import net.dv8tion.jda.api.entities.channel.middleman.MessageChannel;
-import net.dv8tion.jda.api.events.message.GenericMessageEvent;
 import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
 import net.dv8tion.jda.api.events.message.react.MessageReactionAddEvent;
-import net.dv8tion.jda.api.events.session.ReadyEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
-import net.dv8tion.jda.api.requests.RestAction;
 
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
@@ -20,13 +13,21 @@ import java.time.format.DateTimeFormatter;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Consumer;
+
+import com.cloudgarden.discordbot.commands.CommandManager;
+import net.dv8tion.jda.api.interactions.commands.Command;
 
 public class EventListener extends ListenerAdapter {
 
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
-    private int flag =0;
+    private boolean shouldExecuteCheck = false;
+    private final CommandManager commandManager;
 
+    public EventListener(CommandManager commandManager) {
+        this.commandManager = commandManager;
+    }
+
+    // Used for printing time at which user has watered plant
     @Override
     public void onMessageReactionAdd(MessageReactionAddEvent event) {
         String emoji = event.getReaction().getEmoji().getAsReactionCode();
@@ -50,30 +51,24 @@ public class EventListener extends ListenerAdapter {
             channel.sendMessage(message).queue();
     }
 
-    @Override
-    public void onMessageReceived(MessageReceivedEvent event) {
-        if (flag == 0 && event.getAuthor().isBot()) {
 
-            scheduler.schedule(() -> {
-                event.getChannel().sendMessage("Number 3. Lilly needs to be watered").queue();
-               flag = 1;
-            }, 10, TimeUnit.SECONDS);
+    // used to notify user and periodically check status of the plant
+    public void onMessageReceived(MessageReceivedEvent event) {
+        if (event.getMessage().getContentRaw().contains("startChecking")) {
+            shouldExecuteCheck = true;
+            startPeriodicCheck(event.getChannel());
+        } else if (event.getMessage().getContentRaw().equals("stopChecking")) { // not really useful but nice to have
+            shouldExecuteCheck = false;
+            event.getChannel().sendMessage("I'll no longer check your plants.").queue();
         }
-//            String message = event.getMessage().getContentRaw();
-//            if (message.equals("")) {
-//                event.getChannel().sendMessage("Waiting for 10 seconds...").queue();
-//        }
-//        ) return;
-//
-//        String message = event.getMessage().getContentRaw();
-//        if (message.equals("")) {
-//            event.getChannel().sendMessage("Waiting for 10 seconds...").queue();
-//
-//            // Schedule a task to send a message after 10 seconds
-//            scheduler.schedule(() -> {
-//                event.getChannel().sendMessage("10 seconds have passed!").queue();
-//            }, 10, TimeUnit.SECONDS);
-//        }
     }
 
+    private void startPeriodicCheck(MessageChannel channel) {
+        scheduler.scheduleAtFixedRate(() -> {
+            if (shouldExecuteCheck) {
+                String response = commandManager.whoToWater();
+                channel.sendMessage(response).queue();
+            }
+        }, 0, 15, TimeUnit.MINUTES);
+    }
 }

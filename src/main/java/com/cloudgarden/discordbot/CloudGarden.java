@@ -30,8 +30,11 @@ public class CloudGarden {
         builder.setActivity(Activity.listening("To your plants )_)"));
         shardManager = builder.build();
 
+        CommandManager commandManager = new CommandManager();
+        EventListener eventListener = new EventListener(commandManager);
+
         // Register listeners
-        shardManager.addEventListener(new EventListener(), new CommandManager());
+        shardManager.addEventListener(eventListener, commandManager);
     }
 
     public Dotenv getConfig() { return config; }
